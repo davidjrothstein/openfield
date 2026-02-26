@@ -14,7 +14,7 @@ const _jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Fieldwork — Calm Email',
+  title: 'OpenField — Calm Email',
   description: 'A calm, focused AI email client designed for clarity',
   generator: 'v0.app',
   icons: {

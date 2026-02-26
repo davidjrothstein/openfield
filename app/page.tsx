@@ -16,7 +16,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
-import { SquarePen, X, Focus, ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen } from "lucide-react"
+import { SquarePen, X, Focus, ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen, Mail } from "lucide-react"
 import type { Theme } from "@/components/folder-nav"
 import { cn } from "@/lib/utils"
 
@@ -47,7 +47,35 @@ export default function Page() {
   const [editingFilter, setEditingFilter] = useState<SavedFilter | null>(null)
   const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
 
-  const todoSystem = useTodos(emails)
+  // Live email list — starts with static demo data, replaced by real emails when Gmail is connected
+  const [emailList, setEmailList] = useState(emails)
+  const [authStatus, setAuthStatus] = useState<{
+    authenticated: boolean
+    userEmail?: string
+    provider?: string
+  }>({ authenticated: false })
+
+  // Check auth status on mount
+  useEffect(() => {
+    fetch("/api/auth/status")
+      .then((r) => r.json())
+      .then((data) => setAuthStatus(data))
+      .catch(() => {/* ignore — falls back to demo data */})
+  }, [])
+
+  // Re-fetch emails from the active provider whenever the folder or auth state changes
+  useEffect(() => {
+    if (!authStatus.authenticated) {
+      setEmailList(emails)
+      return
+    }
+    fetch(`/api/emails?folder=${activeFolder}&maxResults=100`)
+      .then((r) => r.json())
+      .then((data) => { if (data.emails?.length) setEmailList(data.emails) })
+      .catch(() => setEmailList(emails))
+  }, [authStatus.authenticated, activeFolder])
+
+  const todoSystem = useTodos(emailList)
 
   // Apply theme + dark classes to <html>
   useEffect(() => {
@@ -126,17 +154,17 @@ export default function Page() {
     }
   }, [completedTasks, dismissedTasks])
 
-  const selectedEmail = emails.find((e) => e.id === selectedEmailId) ?? null
-  const inboxEmails = emails.filter((e) => e.folder !== "drafts" && e.folder !== "sent")
+  const selectedEmail = emailList.find((e) => e.id === selectedEmailId) ?? null
+  const inboxEmails = emailList.filter((e) => e.folder !== "drafts" && e.folder !== "sent")
   const priorityCount = inboxEmails.filter((e) => e.priority).length
   const actionNeededCount = inboxEmails.filter((e) => e.actionRequired).length
   const informationalCount = inboxEmails.filter((e) => !e.actionRequired && !e.priority && !e.isDistributionList).length
   const newslettersCount = inboxEmails.filter((e) => e.isDistributionList).length
-  const sentCount = emails.filter((e) => e.folder === "sent").length
-  const draftsCount = emails.filter((e) => e.folder === "drafts").length
+  const sentCount = emailList.filter((e) => e.folder === "sent").length
+  const draftsCount = emailList.filter((e) => e.folder === "drafts").length
 
   // All emails with action items (for batch mode)
-  const allActionEmails = emails.filter((e) => e.actions.length > 0 && !dismissedTasks.has(e.id))
+  const allActionEmails = emailList.filter((e) => e.actions && e.actions.length > 0 && !dismissedTasks.has(e.id))
   const totalActionEmails = allActionEmails.length
 
   // Batch: current slice of 5
@@ -145,9 +173,9 @@ export default function Page() {
   const batchActioned = currentBatch.every((e) => completedTasks.has(e.id) || dismissedTasks.has(e.id))
   const hasMoreBatches = batchStart + BATCH_SIZE < allActionEmails.length
 
-  const isInboxEmail = (e: typeof emails[0]) => e.folder !== "drafts" && e.folder !== "sent"
+  const isInboxEmail = (e: typeof emailList[0]) => e.folder !== "drafts" && e.folder !== "sent"
 
-  const matchesFilter = useCallback((e: typeof emails[0], conditions: FilterCondition[]) => {
+  const matchesFilter = useCallback((e: typeof emailList[0], conditions: FilterCondition[]) => {
     return conditions.every((c) => {
       switch (c.field) {
         case "status":
@@ -178,8 +206,8 @@ export default function Page() {
   const filteredEmails = batchMode
     ? currentBatch
     : activeFilter
-      ? emails.filter((e) => isInboxEmail(e) && matchesFilter(e, activeFilter.conditions))
-      : emails.filter((e) => {
+      ? emailList.filter((e) => isInboxEmail(e) && matchesFilter(e, activeFilter.conditions))
+      : emailList.filter((e) => {
           if (activeFolder === "inbox") return isInboxEmail(e)
           if (activeFolder === "priority") return e.priority && isInboxEmail(e)
           if (activeFolder === "action-needed") return e.actionRequired && isInboxEmail(e)
@@ -317,7 +345,7 @@ export default function Page() {
         {/* Left */}
         <div className="app-no-drag flex items-center gap-3">
           <span className="text-sm font-medium text-foreground tracking-tight">
-            Fieldwork
+            OpenField
           </span>
           <button
             onClick={handleCompose}
@@ -341,6 +369,32 @@ export default function Page() {
         </div>
         {/* Right */}
         <div className="app-no-drag ml-auto flex items-center gap-3 text-muted-foreground">
+          {authStatus.authenticated ? (
+            <span className="flex items-center gap-1.5 text-xs">
+              <Mail className="size-3" />
+              <span>{authStatus.userEmail}</span>
+              <button
+                onClick={() =>
+                  fetch("/api/auth/logout", { method: "POST" }).then(() =>
+                    setAuthStatus({ authenticated: false })
+                  )
+                }
+                className="rounded px-1.5 py-0.5 text-[10px] hover:bg-muted"
+                aria-label="Sign out of Gmail"
+              >
+                Sign out
+              </button>
+            </span>
+          ) : (
+            <a
+              href="/api/auth/gmail"
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Connect Gmail account"
+            >
+              <Mail className="size-3.5" />
+              <span>Connect Gmail</span>
+            </a>
+          )}
           <span className="text-xs">
             <CurrentTime />
           </span>
