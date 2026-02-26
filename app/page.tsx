@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { emails } from "@/lib/email-data"
+import { useAuth } from "@/hooks/use-auth"
+import { useEmails } from "@/hooks/use-emails"
+import { SignIn } from "@/components/sign-in"
 import { FolderNav, type DarkModePreference } from "@/components/folder-nav"
 import { EmailList, type Density } from "@/components/email-list"
 import { EmailViewer } from "@/components/email-viewer"
@@ -22,8 +24,11 @@ import { cn } from "@/lib/utils"
 
 // Sidebar collapse/expand toggle
 export default function Page() {
-  const [selectedEmailId, setSelectedEmailId] = useState<string | null>("1")
+  const auth = useAuth()
   const [activeFolder, setActiveFolder] = useState("inbox")
+  const { emails, isLoading: emailsLoading } = useEmails(activeFolder, auth.isAuthenticated)
+
+  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null)
   const [commandOpen, setCommandOpen] = useState(false)
   const [pendingDraft, setPendingDraft] = useState<string | null>(null)
   const [replyActive, setReplyActive] = useState(false)
@@ -46,6 +51,13 @@ export default function Page() {
   const [filterModalOpen, setFilterModalOpen] = useState(false)
   const [editingFilter, setEditingFilter] = useState<SavedFilter | null>(null)
   const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
+
+  // Select first email when emails load for the first time
+  useEffect(() => {
+    if (emails.length > 0 && selectedEmailId === null) {
+      setSelectedEmailId(emails[0].id)
+    }
+  }, [emails, selectedEmailId])
 
   const todoSystem = useTodos(emails)
 
@@ -253,6 +265,19 @@ export default function Page() {
     setPendingDraft(null)
   }, [selectedEmailId])
 
+  // Auth gate — show sign-in screen when not authenticated
+  if (auth.isLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-foreground" />
+      </div>
+    )
+  }
+
+  if (!auth.isAuthenticated) {
+    return <SignIn />
+  }
+
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background">
       {/* Focus mode overlays */}
@@ -341,9 +366,21 @@ export default function Page() {
         </div>
         {/* Right */}
         <div className="app-no-drag ml-auto flex items-center gap-3 text-muted-foreground">
+          {emailsLoading && (
+            <div className="h-3 w-3 animate-spin rounded-full border border-border border-t-foreground" />
+          )}
           <span className="text-xs">
             <CurrentTime />
           </span>
+          {auth.userEmail && (
+            <button
+              onClick={auth.signOut}
+              title={`Signed in as ${auth.userEmail} — click to sign out`}
+              className="max-w-[120px] truncate text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground"
+            >
+              {auth.userEmail}
+            </button>
+          )}
         </div>
       </div>
 
