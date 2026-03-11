@@ -57,7 +57,7 @@ export async function GET(request: Request) {
   // ------------------------------------------------------------------
   const folder = searchParams.get("folder") ?? "inbox"
   const maxResults = Math.min(
-    parseInt(searchParams.get("maxResults") ?? "25", 10),
+    parseInt(searchParams.get("maxResults") ?? "25", 10) || 25,
     50,
   )
   const query = searchParams.get("query") ?? undefined

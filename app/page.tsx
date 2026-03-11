@@ -85,34 +85,6 @@ export default function Page() {
     setViewerHidden(false)
   }, [layoutMode])
 
-  // 3-state cycle: unchecked -> checked -> dismissed (blank) -> unchecked
-  const toggleTask = useCallback((emailId: string) => {
-    setCompletedTasks((prev) => {
-      const isCompleted = prev.has(emailId)
-      if (isCompleted) {
-        // completed -> dismissed: remove from completed
-        const next = new Set(prev)
-        next.delete(emailId)
-        return next
-      }
-      // Check if currently dismissed
-      setDismissedTasks((dp) => {
-        if (dp.has(emailId)) {
-          // dismissed -> unchecked: remove from dismissed
-          const next = new Set(dp)
-          next.delete(emailId)
-          return next
-        }
-        return dp
-      })
-      // If not completed and not dismissed: unchecked -> completed
-      const next = new Set(prev)
-      next.add(emailId)
-      return next
-    })
-  }, [])
-
-  // Separate handler for the completed->dismissed transition
   const handleToggleTask = useCallback((emailId: string) => {
     const isCompleted = completedTasks.has(emailId)
     const isDismissed = dismissedTasks.has(emailId)

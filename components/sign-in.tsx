@@ -86,7 +86,7 @@ export function SignIn() {
       </div>
 
       <p className="mt-6 max-w-xs text-center text-[11px] text-muted-foreground/50">
-        Fieldwork requests read-only Gmail access. Your credentials are encrypted
+        Fieldwork requests Gmail access to read emails and mark them as read. Your credentials are encrypted
         and never stored in plaintext.
       </p>
     </div>
