@@ -45,10 +45,12 @@ def app_engine():
 
 @pytest.fixture()
 def fixture_ids(owner_engine):
-    """Insert a geography/run scaffold and return the ids needed for a test.
+    """Return the (geo, metric, source) ids these tests use, and clear any rows
+    from a prior run so the fixed (geo,metric,period,vintage) tuples are free.
 
-    Uses the owner connection for setup; observation writes themselves go
-    through the app role in the tests so we exercise the real grant set."""
+    Cleanup uses the owner role (the app role can't delete); the observation
+    writes under test still go through the app role to exercise the real grant
+    set. These tests use 2025 periods, exclusive to this module."""
     with owner_engine.begin() as c:
         geo_id = c.execute(
             text("SELECT id FROM geography WHERE cbsa_code = '19100'")
@@ -59,6 +61,13 @@ def fixture_ids(owner_engine):
         source_id = c.execute(
             text("SELECT id FROM source WHERE code = 'census_bps'")
         ).scalar_one()
+        c.execute(
+            text(
+                "DELETE FROM observation WHERE geography_id = :g AND metric_id = :m "
+                "AND period >= DATE '2025-01-01'"
+            ),
+            {"g": geo_id, "m": metric_id},
+        )
     return geo_id, metric_id, source_id
 
 

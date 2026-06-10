@@ -31,6 +31,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -225,4 +226,31 @@ class Observation(Base):
         Index("ix_observation_ingest_run", "ingest_run_id"),
         Index("ix_observation_source", "source_id"),
         Index("ix_observation_metric_period", "metric_id", "period"),
+    )
+
+
+class NormalizationQuarantine(Base):
+    """Rows that could not be safely mapped to a canonical observation (TDS §4.2,
+    §6.2). Normalization *quarantines with a reason* — it never silently drops.
+    The offending raw record is retained for review and reprocessing."""
+
+    __tablename__ = "normalization_quarantine"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    ingest_run_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ingestion_run.id"), nullable=False
+    )
+    source_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("source.id"))
+    raw_geography: Mapped[str | None] = mapped_column(Text)
+    raw_metric: Mapped[str | None] = mapped_column(Text)
+    raw_period: Mapped[str | None] = mapped_column(Text)
+    raw_value: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_quarantine_run", "ingest_run_id"),
     )
