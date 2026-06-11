@@ -70,6 +70,16 @@ against a real Postgres:
 MIP_DATABASE_URL=... MIP_APP_DATABASE_URL=... pytest -q
 ```
 
+## Lineage (E1.2 / E8.1)
+
+`app/lineage.py` is the generic walker: given any `(node_type, id)` it returns
+the chain to source, via a per-node-type resolver registry. Derived layers
+(feature, signal, convergence) **register** into it as they land in E3–E5 — the
+walker never changes. Exposed at `GET /api/v1/lineage/{node_type}/{node_id}`
+(`app/main.py`, served on the restricted role). The integrity check
+(`python -m app.integrity_job`) asserts every derived row references existing
+inputs; array-ref layers register checkers the same way.
+
 ## Conventions
 
 - Alembic migrations only; **forward-only**, reviewed before running. The
