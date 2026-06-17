@@ -115,8 +115,9 @@ def seeded_observations():
     test's features)."""
     owner = create_engine(OWNER_URL, future=True)
     with owner.begin() as c:
-        # Features are derived/recomputable; clear them so a stale row from a
-        # prior run can't reference observations we're about to replace.
+        # Derived layers are recomputable; clear signals (which ref features)
+        # then features, so a stale row from a prior run can't dangle.
+        c.execute(text("DELETE FROM signal"))
         c.execute(text("DELETE FROM feature"))
         metric_id = c.execute(
             text("SELECT id FROM metric_series WHERE code = :code"), {"code": METRIC_CODE}

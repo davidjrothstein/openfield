@@ -285,6 +285,68 @@ class Feature(Base):
     )
 
 
+class Signal(Base):
+    """Derived, append-only, superseding detector output (TDS §5.3, §9).
+
+    A re-fire supersedes its predecessor via ``superseded_by`` (the old row
+    persists, never deleted). Salience decays at read time as a function of
+    ``as_of`` age — never a stored mutation. Lineage: ``feature_refs`` are array
+    refs to the features the detector consumed. Single-signal confidence excludes
+    corroboration by design (TDS §9.3), so a leading-domain signal is never
+    down-weighted merely for lacking it."""
+
+    __tablename__ = "signal"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    geography_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("geography.id"), nullable=False
+    )
+    domain: Mapped[str] = mapped_column(Text, nullable=False)
+    detector: Mapped[str] = mapped_column(Text, nullable=False)
+    detector_version: Mapped[str] = mapped_column(Text, nullable=False)
+    metric_ref: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("metric_series.id")
+    )
+    direction: Mapped[str] = mapped_column(Text, nullable=False)
+    magnitude: Mapped[float | None] = mapped_column(Numeric)
+    confidence: Mapped[str] = mapped_column(Text, nullable=False)
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    feature_refs: Mapped[list[int]] = mapped_column(ARRAY(BigInteger), nullable=False)
+    superseded_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("signal.id")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "domain IN ('economy','supply','operator','capital')",
+            name="ck_signal_domain",
+        ),
+        CheckConstraint(
+            "direction IN ('improving','deteriorating','neutral')",
+            name="ck_signal_direction",
+        ),
+        CheckConstraint(
+            "confidence IN ('high','moderate','low')", name="ck_signal_confidence"
+        ),
+        Index(
+            "ix_signal_live",
+            "geography_id",
+            "domain",
+            postgresql_where=text("superseded_by IS NULL"),
+        ),
+        Index(
+            "ix_signal_detector_key",
+            "detector",
+            "geography_id",
+            "metric_ref",
+            postgresql_where=text("superseded_by IS NULL"),
+        ),
+    )
+
+
 class NormalizationQuarantine(Base):
     """Rows that could not be safely mapped to a canonical observation (TDS §4.2,
     §6.2). Normalization *quarantines with a reason* — it never silently drops.

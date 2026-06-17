@@ -53,9 +53,10 @@ def clean_period(app_sessionmaker):
     (the app role can't delete). Keeps idempotency/count assertions isolated."""
     owner = create_engine(os.environ["MIP_DATABASE_URL"], future=True)
     with owner.begin() as c:
-        # Derived features are recomputable; clear them so deleting observations
-        # below cannot leave dangling feature refs (real life never deletes
-        # observations — they are append-only).
+        # Derived layers are recomputable; clear them so deleting observations
+        # below cannot leave dangling refs (real life never deletes observations
+        # — they are append-only). Signals reference features, so go first.
+        c.execute(text("DELETE FROM signal"))
         c.execute(text("DELETE FROM feature"))
         c.execute(
             text("DELETE FROM observation WHERE period = :p"), {"p": PERIOD}

@@ -16,6 +16,7 @@ from sqlalchemy.engine import Connection
 
 from . import features as _features  # noqa: F401  (registers feature lineage resolver)
 from . import lineage
+from . import signals as _signals  # noqa: F401  (registers signal lineage resolver)
 from .db import engine
 
 app = FastAPI(title="Multifamily Market Intelligence Platform", version="0.1.0")

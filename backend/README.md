@@ -83,6 +83,21 @@ past `as_of` is the backtest path for free. Every feature stores
 `input_observation_ids` (lineage), and `app/features/lineage.py` registers the
 `feature` resolver + array-ref integrity check with the walker.
 
+## Signal engine (E4)
+
+`app/signals/` runs deterministic detectors over features and emits signals.
+`detectors.py` holds pure `(features, params) → candidate` functions —
+threshold-crossing and trend-break (N consecutive same-sign periods); statistical
+detection is deferred behind the backtest gate. `config.py` holds the reviewed,
+versioned detector params (not scattered in code). `confidence.py` derives
+categorical confidence from detector type + freshness + depth — never
+corroboration (TDS §9.3) — and provides read-time `salience` decay.
+`engine.run(as_of=...)` is idempotent: it inserts a signal, supersedes the prior
+one via `superseded_by` when evidence moves (both rows persist), or no-ops when
+unchanged — maintaining one live signal per (detector, geo, metric). `reads.py`
+returns live signals with decay applied at read time; `lineage.py` registers the
+`signal` resolver (`feature_refs` → feature → observation → source).
+
 ## Lineage (E1.2 / E8.1)
 
 `app/lineage.py` is the generic walker: given any `(node_type, id)` it returns
