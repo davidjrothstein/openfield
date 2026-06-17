@@ -83,6 +83,23 @@ past `as_of` is the backtest path for free. Every feature stores
 `input_observation_ids` (lineage), and `app/features/lineage.py` registers the
 `feature` resolver + array-ref integrity check with the walker.
 
+## Thesis system (E6) — the 60-day milestone
+
+`app/thesis/` is a first-class conviction system, not a notes feature. `thesis`
+is the mutable head; `thesis_version` is the append-only audit ("what did we
+believe, when, why"). `assumption` binds to signals via a stored predicate (not
+a static FK) with a pre-committed `invalidation_threshold`, so new signals are
+evaluated automatically. `evaluate.py` holds the per-assumption state machine
+(intact → watch → challenged → broken) with a pure `decide_state` core;
+`service.py` handles authoring/edit/respond (every change appends a version; a
+challenged assumption requires a recorded response); `health.py` shows
+supporting vs contradicting signals side by side, including contradictions in
+unmodeled domains. Transitions emit `thesis_event` rows (audit + owner alerts).
+Endpoints: `POST /theses`, `GET /theses/{id}/health`,
+`POST /theses/{id}/assumptions/{aid}/respond`. The loop closes: a real
+permit-driven signal reversal moves a real assumption to `challenged`, then
+`broken`, and alerts the owner.
+
 ## Signal engine (E4)
 
 `app/signals/` runs deterministic detectors over features and emits signals.

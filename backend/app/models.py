@@ -372,3 +372,126 @@ class NormalizationQuarantine(Base):
     __table_args__ = (
         Index("ix_quarantine_run", "ingest_run_id"),
     )
+
+
+class Thesis(Base):
+    """The mutable head of a conviction (TDS §5.4, §12.1). Every change appends a
+    ``ThesisVersion`` so the head stays current while the history stays
+    immutable. Status flows draft → active → under_review → closed."""
+
+    __tablename__ = "thesis"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    geography_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("geography.id"), nullable=False
+    )
+    owner: Mapped[str] = mapped_column(Text, nullable=False)
+    claim: Mapped[str] = mapped_column(Text, nullable=False)
+    conviction: Mapped[str] = mapped_column(Text, nullable=False)
+    horizon: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft','active','under_review','closed')", name="ck_thesis_status"
+        ),
+        CheckConstraint(
+            "conviction IN ('low','medium','high')", name="ck_thesis_conviction"
+        ),
+    )
+
+
+class ThesisVersion(Base):
+    """Append-only thesis history — the audit trail (TDS §12.4). One row per
+    change, never overwritten."""
+
+    __tablename__ = "thesis_version"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    thesis_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("thesis.id"), nullable=False
+    )
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    claim: Mapped[str | None] = mapped_column(Text)
+    conviction: Mapped[str | None] = mapped_column(Text)
+    horizon: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str | None] = mapped_column(Text)
+    author: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("thesis_id", "version_no", name="uq_thesis_version_no"),
+    )
+
+
+class Assumption(Base):
+    """A load-bearing assumption with a pre-committed kill-criterion (TDS §12.2).
+
+    Binding is a stored predicate (``supporting_signal_query``), not a static FK,
+    so newly emitted signals are evaluated automatically on every run.
+    Per-assumption state machine: intact → watch → challenged → broken."""
+
+    __tablename__ = "assumption"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    thesis_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("thesis.id"), nullable=False
+    )
+    statement: Mapped[str] = mapped_column(Text, nullable=False)
+    supporting_signal_query: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    invalidation_threshold: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    state: Mapped[str] = mapped_column(Text, nullable=False, server_default="intact")
+    needs_response: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    state_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('intact','watch','challenged','broken')", name="ck_assumption_state"
+        ),
+        Index("ix_assumption_thesis", "thesis_id"),
+    )
+
+
+class ThesisEvent(Base):
+    """State transitions, owner alerts, and analyst responses — the audit trail
+    and (until E10) the in-app alert feed (TDS §12.4)."""
+
+    __tablename__ = "thesis_event"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    thesis_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("thesis.id"), nullable=False
+    )
+    assumption_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("assumption.id")
+    )
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    from_state: Mapped[str | None] = mapped_column(Text)
+    to_state: Mapped[str | None] = mapped_column(Text)
+    detail: Mapped[str | None] = mapped_column(Text)
+    signal_refs: Mapped[list[int] | None] = mapped_column(ARRAY(BigInteger))
+    actor: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('state_change','alert','response')", name="ck_thesis_event_type"
+        ),
+        Index("ix_thesis_event_thesis", "thesis_id", "created_at"),
+    )
