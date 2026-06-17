@@ -56,6 +56,7 @@ def clean_period(app_sessionmaker):
         # Derived layers are recomputable; clear them so deleting observations
         # below cannot leave dangling refs (real life never deletes observations
         # — they are append-only). Signals reference features, so go first.
+        c.execute(text("DELETE FROM convergence_assessment"))
         c.execute(text("DELETE FROM signal"))
         c.execute(text("DELETE FROM feature"))
         c.execute(

@@ -83,6 +83,24 @@ past `as_of` is the backtest path for free. Every feature stores
 `input_observation_ids` (lineage), and `app/features/lineage.py` registers the
 `feature` resolver + array-ref integrity check with the walker.
 
+## Convergence + regime (E5)
+
+`app/convergence/` produces the per-domain stance matrix — the intellectual
+core, with NO scalar. `collapse.py` (pure) collapses a domain's live signals to
+ONE stance (conflict → `mixed`, never averaged; no fresh signals → `no_read`,
+distinct from `neutral`) and computes breadth (a count) and coherence (an enum).
+`engine.recompute` upserts a `convergence_assessment` per (geo, as_of) storing
+contributing signal ids for full decomposition; `lineage.py` registers the
+resolver (assessment → signals → features → observations → source). The market
+view is `GET /markets/{geo_id}`.
+
+`app/regime/` asserts regimes only by human action: `set_regime` is the 60-day
+manual analyst tag; `confirm_proposal` copies an engine proposal into a regime
+with `assigned_by` = the confirming user (the 90-day rule engine writes only
+`regime_proposal`). `regime.assigned_by` is NOT NULL — no regime without a human.
+Transitions preserve the prior row via `superseded_by`, and a regime change
+re-reviews the market's theses.
+
 ## Thesis system (E6) — the 60-day milestone
 
 `app/thesis/` is a first-class conviction system, not a notes feature. `thesis`

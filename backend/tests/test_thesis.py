@@ -143,6 +143,7 @@ def _seed_clean(owner_engine, dallas_id):
         metric_id = c.execute(text("SELECT id FROM metric_series WHERE code=:c"), {"c": METRIC_CODE}).scalar_one()
         source_id = c.execute(text("SELECT id FROM source WHERE code='census_bps'")).scalar_one()
         # Clear derived layers + all permits_5plus observations for a clean slate.
+        c.execute(text("DELETE FROM convergence_assessment"))
         c.execute(text("DELETE FROM signal"))
         c.execute(text("DELETE FROM feature"))
         c.execute(text("DELETE FROM observation WHERE metric_id=:m"), {"m": metric_id})

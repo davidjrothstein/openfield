@@ -117,6 +117,7 @@ def seeded_observations():
     with owner.begin() as c:
         # Derived layers are recomputable; clear signals (which ref features)
         # then features, so a stale row from a prior run can't dangle.
+        c.execute(text("DELETE FROM convergence_assessment"))
         c.execute(text("DELETE FROM signal"))
         c.execute(text("DELETE FROM feature"))
         metric_id = c.execute(

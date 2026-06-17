@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import sys
 
+from . import convergence as _convergence  # noqa: F401  (registers convergence integrity check)
 from . import features as _features  # noqa: F401  (registers feature integrity check)
 from . import signals as _signals  # noqa: F401  (registers signal integrity check)
 from .db import engine

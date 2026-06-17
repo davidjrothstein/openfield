@@ -495,3 +495,102 @@ class ThesisEvent(Base):
         ),
         Index("ix_thesis_event_thesis", "thesis_id", "created_at"),
     )
+
+
+class ConvergenceAssessment(Base):
+    """Per-domain stance matrix — the intellectual core (TDS §10).
+
+    ``per_domain_stance`` is JSONB with four keys (economy/supply/operator/
+    capital), each ``{stance, confidence, contributing_signal_ids}``. There is
+    deliberately NO scalar field — nothing reduces this to a single number. A
+    domain with no fresh signals reads ``no_read`` (distinct from ``neutral``).
+    Recomputed per run, retained with ``as_of``."""
+
+    __tablename__ = "convergence_assessment"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    geography_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("geography.id"), nullable=False
+    )
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    per_domain_stance: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    breadth: Mapped[int] = mapped_column(Integer, nullable=False)
+    coherence: Mapped[str] = mapped_column(Text, nullable=False)
+    weakest_data_flag: Mapped[str | None] = mapped_column(Text)
+    synthesis_text: Mapped[str | None] = mapped_column(Text)
+    transform_version: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "geography_id", "as_of", "transform_version", name="uq_convergence_key"
+        ),
+        CheckConstraint("breadth BETWEEN 0 AND 4", name="ck_convergence_breadth"),
+        CheckConstraint(
+            "coherence IN ('yes','partial','no')", name="ck_convergence_coherence"
+        ),
+        Index("ix_convergence_geo_asof", "geography_id", "as_of"),
+    )
+
+
+class RegimeProposal(Base):
+    """Engine-proposed regime awaiting human confirmation (TDS §11.2). The 90-day
+    rule engine writes here; nothing is asserted until a principal confirms."""
+
+    __tablename__ = "regime_proposal"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    geography_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("geography.id"), nullable=False
+    )
+    regime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_refs: Mapped[dict | None] = mapped_column(JSONB)
+    confidence: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending','confirmed','rejected')", name="ck_regime_proposal_status"
+        ),
+    )
+
+
+class Regime(Base):
+    """A versioned, time-bounded regime assertion (TDS §11.3). ``assigned_by`` is
+    NOT NULL — no regime exists without a human action (manual tag or a confirmed
+    proposal). Transitions preserve the prior row via ``superseded_by``."""
+
+    __tablename__ = "regime"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    geography_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("geography.id"), nullable=False
+    )
+    regime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
+    effective_to: Mapped[date | None] = mapped_column(Date)
+    evidence_refs: Mapped[dict | None] = mapped_column(JSONB)
+    confidence: Mapped[str | None] = mapped_column(Text)
+    assigned_by: Mapped[str] = mapped_column(Text, nullable=False)
+    source_proposal_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("regime_proposal.id")
+    )
+    superseded_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("regime.id")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_regime_current",
+            "geography_id",
+            postgresql_where=text("effective_to IS NULL"),
+        ),
+    )
