@@ -14,6 +14,7 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.engine import Connection
 
+from . import features as _features  # noqa: F401  (registers feature lineage resolver)
 from . import lineage
 from .db import engine
 

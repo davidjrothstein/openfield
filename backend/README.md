@@ -70,6 +70,19 @@ against a real Postgres:
 MIP_DATABASE_URL=... MIP_APP_DATABASE_URL=... pytest -q
 ```
 
+## Feature engine (E3)
+
+`app/features/` turns vintage-correct observations into detector-ready features.
+`transforms.py` holds pure functions (YoY/QoQ deltas, cross-sectional and
+longitudinal z-scores) that emit `insufficient_data=true` with a null value
+rather than fabricating a number for a thin window. `engine.recompute(as_of=...)`
+is the idempotent in-code DAG: it reads each market's series through
+`observation_as_of`, upserts features on their unique key (stable ids so
+downstream refs survive), and — because it reads vintage-correct — replaying a
+past `as_of` is the backtest path for free. Every feature stores
+`input_observation_ids` (lineage), and `app/features/lineage.py` registers the
+`feature` resolver + array-ref integrity check with the walker.
+
 ## Lineage (E1.2 / E8.1)
 
 `app/lineage.py` is the generic walker: given any `(node_type, id)` it returns

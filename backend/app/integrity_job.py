@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import sys
 
+from . import features as _features  # noqa: F401  (registers feature integrity check)
 from .db import engine
 from .lineage import run_integrity_check
 

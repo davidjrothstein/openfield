@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from sqlalchemy import (
+    ARRAY,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -226,6 +227,61 @@ class Observation(Base):
         Index("ix_observation_ingest_run", "ingest_run_id"),
         Index("ix_observation_source", "source_id"),
         Index("ix_observation_metric_period", "metric_id", "period"),
+    )
+
+
+class Feature(Base):
+    """Derived, versioned, recomputable detector input (TDS §5.2).
+
+    Not append-only — the recompute pass rewrites features idempotently — but
+    lineage is mandatory: ``input_observation_ids`` are array refs to the
+    observations the feature was computed from (CLAUDE.md #2). ``insufficient_data``
+    is never null and a null ``value`` must be flagged insufficient (the engine
+    never fabricates a value for a thin window)."""
+
+    __tablename__ = "feature"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    geography_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("geography.id"), nullable=False
+    )
+    metric_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("metric_series.id"), nullable=False
+    )
+    feature_type: Mapped[str] = mapped_column(Text, nullable=False)
+    period: Mapped[date] = mapped_column(Date, nullable=False)
+    value: Mapped[float | None] = mapped_column(Numeric)
+    insufficient_data: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    transform_version: Mapped[str] = mapped_column(Text, nullable=False)
+    input_vintage_hi: Mapped[date] = mapped_column(Date, nullable=False)
+    input_observation_ids: Mapped[list[int]] = mapped_column(
+        ARRAY(BigInteger), nullable=False, server_default=text("'{}'::bigint[]")
+    )
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "geography_id",
+            "metric_id",
+            "feature_type",
+            "period",
+            "transform_version",
+            name="uq_feature_key",
+        ),
+        CheckConstraint(
+            "value IS NOT NULL OR insufficient_data = true",
+            name="ck_feature_no_silent_null",
+        ),
+        Index(
+            "ix_feature_metric_type_period",
+            "metric_id",
+            "feature_type",
+            "period",
+        ),
     )
 
 

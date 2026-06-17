@@ -52,6 +52,9 @@ def ingested(app_engine, tmp_path_factory):
     """Land one real-shaped run so there is provenance to walk."""
     owner = create_engine(os.environ["MIP_DATABASE_URL"], future=True)
     with owner.begin() as c:
+        # Clear derived features (recomputable) so the integrity check starts
+        # from a clean slate not polluted by other tests' deletions.
+        c.execute(text("DELETE FROM feature"))
         c.execute(text("DELETE FROM observation WHERE period = :p"), {"p": PERIOD})
     owner.dispose()
 
