@@ -83,6 +83,18 @@ past `as_of` is the backtest path for free. Every feature stores
 `input_observation_ids` (lineage), and `app/features/lineage.py` registers the
 `feature` resolver + array-ref integrity check with the walker.
 
+## Background jobs (E10)
+
+`app/jobs/recompute.py` is the nightly recompute DAG — one explicit in-code
+pipeline (no Airflow): features → signals → convergence → thesis evaluation →
+freshness scan → notifications. Every stage is idempotent, so the whole pass is
+re-runnable after failure with no drift or duplicate notifications.
+`freshness.py` classifies fresh/aging/stale per (geo, metric) vs cadence and
+exposes the weakest-input freshness for an aggregate; `notifications.py` turns
+thesis invalidation alerts into a deduplicated in-app list (`GET /notifications`,
+no email/escalation in V1). `scheduler.py` wires the nightly job + monthly Census
+fetch on APScheduler (RQ-enqueueable when a Redis worker is deployed).
+
 ## Convergence + regime (E5)
 
 `app/convergence/` produces the per-domain stance matrix — the intellectual

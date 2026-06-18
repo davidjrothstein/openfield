@@ -594,3 +594,64 @@ class Regime(Base):
             postgresql_where=text("effective_to IS NULL"),
         ),
     )
+
+
+class DataFreshness(Base):
+    """Per (geography, metric) freshness read model (TDS §6.4). Computed centrally
+    so every aggregate can show the freshness of its weakest input. Upserted each
+    scan; not append-only."""
+
+    __tablename__ = "data_freshness"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    geography_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("geography.id"), nullable=False
+    )
+    metric_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("metric_series.id"), nullable=False
+    )
+    latest_period: Mapped[date | None] = mapped_column(Date)
+    latest_vintage: Mapped[date | None] = mapped_column(Date)
+    state: Mapped[str] = mapped_column(Text, nullable=False)
+    age_days: Mapped[int | None] = mapped_column(Integer)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("geography_id", "metric_id", name="uq_freshness_geo_metric"),
+        CheckConstraint(
+            "state IN ('fresh','aging','stale','no_data')", name="ck_freshness_state"
+        ),
+    )
+
+
+class Notification(Base):
+    """In-app review list (E10.3). Deduplicated by ``dedup_key`` (type, target,
+    period) so a flapping signal does not spam the analyst. No email/escalation
+    in V1."""
+
+    __tablename__ = "notification"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    recipient: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[str | None] = mapped_column(Text)
+    thesis_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("thesis.id"))
+    assumption_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("assumption.id")
+    )
+    signal_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("signal.id"))
+    dedup_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('thesis_invalidation','signal')", name="ck_notification_kind"
+        ),
+        Index("ix_notification_recipient", "recipient", "read", "created_at"),
+    )

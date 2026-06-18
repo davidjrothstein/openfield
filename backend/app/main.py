@@ -155,8 +155,19 @@ def get_market(geo_id: int, conn: Connection = Depends(get_conn)) -> dict:
         ),
         {"g": geo_id},
     ).mappings().first()
+    # Weakest-input freshness — the worst state among metrics that have data,
+    # rendered as a first-class state, never hidden (TDS §11.2/§15.3).
+    weakest = conn.execute(
+        text(
+            "SELECT state FROM data_freshness WHERE geography_id = :g AND state <> 'no_data' "
+            "ORDER BY CASE state WHEN 'stale' THEN 3 WHEN 'aging' THEN 2 WHEN 'fresh' THEN 1 "
+            "ELSE 0 END DESC LIMIT 1"
+        ),
+        {"g": geo_id},
+    ).scalar()
     return {
         "geography_id": geo_id,
+        "weakest_freshness": weakest,
         "convergence": None
         if row is None
         else {
@@ -177,6 +188,54 @@ def get_market(geo_id: int, conn: Connection = Depends(get_conn)) -> dict:
             "assigned_by": regime["assigned_by"],
         },
     }
+
+
+# --------------------------------------------------------------------------- #
+# Notifications (E10.3)
+# --------------------------------------------------------------------------- #
+@app.get("/api/v1/notifications")
+def list_notifications(
+    recipient: str, unread_only: bool = False, conn: Connection = Depends(get_conn)
+) -> dict:
+    """In-app notification list for a recipient (no email/escalation in V1)."""
+    from sqlalchemy import text
+
+    sql = (
+        "SELECT id, kind, title, body, thesis_id, assumption_id, signal_id, read, "
+        "created_at FROM notification WHERE recipient = :r"
+        + (" AND read = false" if unread_only else "")
+        + " ORDER BY created_at DESC, id DESC"
+    )
+    rows = conn.execute(text(sql), {"r": recipient}).mappings().all()
+    return {
+        "recipient": recipient,
+        "notifications": [
+            {
+                "id": r["id"],
+                "kind": r["kind"],
+                "title": r["title"],
+                "body": r["body"],
+                "thesis_id": r["thesis_id"],
+                "assumption_id": r["assumption_id"],
+                "signal_id": r["signal_id"],
+                "read": r["read"],
+                "created_at": r["created_at"].isoformat(),
+            }
+            for r in rows
+        ],
+    }
+
+
+@app.post("/api/v1/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: int, session: Session = Depends(get_session)) -> dict:
+    from .models import Notification
+
+    n = session.get(Notification, notification_id)
+    if n is None:
+        raise HTTPException(status_code=404, detail=f"no notification {notification_id}")
+    n.read = True
+    session.commit()
+    return {"id": n.id, "read": True}
 
 
 @app.get("/api/v1/healthz")
