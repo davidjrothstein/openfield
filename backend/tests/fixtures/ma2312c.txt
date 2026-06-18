@@ -1,0 +1,5 @@
+Census Building Permits Survey - Metropolitan Area - Monthly (current month)
+Date,CBSA,Name,1u Bldgs,1u Units,1u Value,2u Bldgs,2u Units,2u Value,34u Bldgs,34u Units,34u Value,5pu Bldgs,5pu Units,5pu Value
+202312,19100,"Dallas-Fort Worth-Arlington, TX",1000,1000,150000,0,0,0,50,200,30000,30,1500,200000
+202312,12420,"Austin-Round Rock-Georgetown, TX",800,800,120000,0,0,0,25,100,15000,40,2000,260000
+202312,99999,"Nowhere City, ZZ",10,10,1000,0,0,0,0,0,0,0,0,0
